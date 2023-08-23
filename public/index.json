@@ -1,0 +1,134 @@
+[
+{
+	"uri": "/6-glue/6.1-crawler/",
+	"title": "Create Crawler",
+	"tags": [],
+	"description": "",
+	"content": "Creating an IAM Role To start, we need to create a role in IAM.\nEnter \u0026ldquo;IAM\u0026rdquo; in the service search bar on the AWS Console, then select \u0026ldquo;IAM.\u0026rdquo; In the left navigation pane, select Roles. Then click Create role. Choose AWS service and find AWS service Glue. Click Next. Search for policies with the keyword Power. Select PowerUserAccess and click Next. In the Role name field, enter: Lab-role. Click Create role. Next, we proceed to create the crawler.\nEnter \u0026ldquo;Glue\u0026rdquo; in the service search bar on the AWS Console, then select \u0026ldquo;AWS Glue.\u0026rdquo; In the left navigation pane, select Crawlers. Click Add database. Enter the database name as datacatalog-dynamodb. Click Create database. Select the newly created database. Click Add tables using crawler. Enter the crawler name as crawler-aotu-per-hour. Click Next. Click Add a data source. Select DynamoDB and weather-DB (the name of the DynamoDB table created in part 2). Click Add a DynamoDB data source. Choose the AIM role we created earlier: Lab-role. Click Next. Enter the target database as datacatalog-dynamodb.\nIn the Crawler schedule section, select Hourly and 30 Minutes. Click Next.\nReview the information and click Create crawler. Click Run crawler and wait for about 2 minutes until the crawler completes its execution. Check the result after the crawler execution.\nGo to the database table we created in datacatalog-dynamodb. We can see that the table weather_db has been successfully initialized. Select the table weather-db, and we can see that the crawler has successfully extracted data from DynamoDB and built corresponding schemas. "
+},
+{
+	"uri": "/3-lambda/3.1-create/",
+	"title": "Create lambda function",
+	"tags": [],
+	"description": "",
+	"content": " title: \u0026ldquo;Initialize Lambda Function\u0026rdquo; date: \u0026ldquo;2023-07-27\u0026rdquo; weight: 1 chapter: false pre: \u0026quot; 3.1. \u0026quot; Initializing Lambda Function Enter \u0026ldquo;Lambda\u0026rdquo; in the service search bar on the AWS Console, then select \u0026ldquo;Lambda.\u0026rdquo; Choose \u0026ldquo;Create function.\u0026rdquo; Click Author from scratch.\nSet the function name as GetAPI-weather-function.\nChoose Runtime: Python 3.9. Architecture: x86_64 Click the Create function button. Wait for about 3 minutes for the function to be created. Once it\u0026rsquo;s done, you will see the status as shown in the image. Copy the following code and paste it into the Code source.\nimport boto3 import requests import json def lambda_handler(event, context): # Call API to get raw data api_url = \u0026#34;https://api.openweathermap.org/data/2.5/weather?lat=10.76\u0026amp;lon=106.66\u0026amp;appid=b0e2fd79db41681ab871e658860bc3e7\u0026#34; response = requests.get(api_url) if response.status_code == 200: # Get data from API responses raw_data = response.json() # Extract values from API responses temperature = str(raw_data[\u0026#34;main\u0026#34;][\u0026#34;temp\u0026#34;]) # Temperature weather_description = raw_data[\u0026#34;weather\u0026#34;][0][\u0026#34;description\u0026#34;] # Description wind_speed = str(raw_data[\u0026#34;wind\u0026#34;][\u0026#34;speed\u0026#34;]) pressure = str(raw_data[\u0026#34;main\u0026#34;][\u0026#34;pressure\u0026#34;]) humidity = str(raw_data[\u0026#34;main\u0026#34;][\u0026#34;humidity\u0026#34;]) visibility = str(raw_data[\u0026#34;visibility\u0026#34;]) country = raw_data[\u0026#34;sys\u0026#34;][\u0026#34;country\u0026#34;] city_name = raw_data[\u0026#34;name\u0026#34;] # Store data in a DynamoDB table dynamodb = boto3.resource(\u0026#34;dynamodb\u0026#34;) table_name = \u0026#34;weather-Db\u0026#34; # Replace with your actual DynamoDB table name table = dynamodb.Table(table_name) print(table) try: table.put_item( Item={ \u0026#34;timestamp\u0026#34;: str(event[\u0026#34;time\u0026#34;]), \u0026#34;temperature\u0026#34;: temperature, \u0026#34;weather_description\u0026#34;: weather_description, \u0026#34;wind_speed\u0026#34;: wind_speed, \u0026#34;pressure\u0026#34;: pressure, \u0026#34;humidity\u0026#34;: humidity, \u0026#34;visibility\u0026#34;: visibility, \u0026#34;country\u0026#34;: country, \u0026#34;city_name\u0026#34;: city_name } ) return { \u0026#34;statusCode\u0026#34;: 200, \u0026#34;body\u0026#34;: json.dumps(\u0026#39;Data has been stored in DynamoDB successfully.\u0026#39;) } except Exception as e: return { \u0026#34;statusCode\u0026#34;: 500, \u0026#34;body\u0026#34;: f\u0026#34;Error storing data: {str(e)}\u0026#34; } else: return { \u0026#34;statusCode\u0026#34;: response.status_code, \u0026#34;body\u0026#34;: json.dumps(\u0026#39;Failed to retrieve data from the API.\u0026#39;) } After that, click Deploy.\nThe provided source code will help us call the API to retrieve data and store it in DynamoDB.\nNext, we will add layers to the function\n"
+},
+{
+	"uri": "/4-event/4.1-create/",
+	"title": "Create Schedules",
+	"tags": [],
+	"description": "",
+	"content": "Initializing Schedules Enter \u0026ldquo;EventBridge\u0026rdquo; in the service search bar on the AWS Console, then select \u0026ldquo;Amazon EventBridge.\u0026rdquo; Choose the Schedules tab on the left side. Then select Create schedule. Set the schedule name as auto-getAPI-weather-per-minute. In the Schedule pattern section, configure it as follows: Scroll down to the bottom and click Next. Choose Templated targets \u0026ndash;\u0026gt; AWS Lambda. Select the Lambda function that we created earlier. Scroll down to the bottom and click Next. Turn off Retry Policy. Scroll down to the bottom and click Next. Review the information and click Create schedule. Wait for about 3 minutes for the schedule to be created. Once it\u0026rsquo;s done, you will see the status as Enabled as shown in the image. Next, let\u0026rsquo;s check if the schedules are working\n"
+},
+{
+	"uri": "/1-introduce/",
+	"title": "Introduction",
+	"tags": [],
+	"description": "",
+	"content": "The data pipeline utilizes a combination of AWS services, including AWS Lambda, Amazon DynamoDB, Amazon S3 (Simple Storage Service), Amazon EventBridge, and AWS Glue. In this pipeline, AWS Lambda is used to invoke APIs and store data into DynamoDB. This Lambda function is triggered automatically every hour through Amazon EventBridge, which is configured to create a recurring schedule. Subsequently, data from DynamoDB undergoes ETL (Extract, Transform, Load) processing by AWS Glue and is then stored in Amazon S3.\nThe diagram below illustrates the data pipeline architecture: Content Introduce Create DynamoDB Build lambda function Use EventBridge to create automated calendars and audit Create S3 AWS Glue Service Configuration Test Resource cleanup "
+},
+{
+	"uri": "/",
+	"title": "Session Management",
+	"tags": [],
+	"description": "",
+	"content": "Implementing Data Pipelines using AWS Services Overall In this workshop, we will create an automated data pipeline that fetches data through an API, utilizing various AWS services such as AWS Lambda, Amazon DynamoDB, Amazon S3 (Simple Storage Service), Amazon EventBridge, and AWS Glue.\nAWS Lambda: It is a serverless cloud computing service by Amazon Web Services. Lambda allows you to run code without managing servers, automatically scales when needed, and charges based on real-time execution. Lambda is often triggered by events such as HTTP requests or events from other AWS services.\nAmazon DynamoDB: It is a NoSQL cloud database service by AWS. It provides flexible and scalable data storage and querying capabilities for web and mobile applications. DynamoDB is designed to offer automatic scaling and reliability, supporting applications with high query volume and real-time requirements.\nAmazon S3 (Simple Storage Service): It is an AWS cloud storage service that offers unlimited storage for data objects like images, videos, files, and storage data. S3 is widely used as a reliable, easy-to-use, and scalable storage solution for web and mobile applications.\nAmazon EventBridge: Amazon EventBridge is an event bus service by AWS that allows applications to send and receive events from different sources in the system. It helps you connect and integrate various applications and services, automatically trigger actions, and process data based on predefined rules.\nAWS Glue: It is a cloud-based ETL (Extract, Transform, Load) service by AWS. It enables you to extract data from various sources, transform data based on predefined rules, and load data into different storage repositories. Glue automatically detects the data structure, minimizing the efforts and time required for ETL processes.\nContent Introduce Create DynamoDB Build lambda function Use EventBridge to create automated calendars and audit Create S3 AWS Glue Service Configuration Test Resource cleanup "
+},
+{
+	"uri": "/3-lambda/3.2-addlayers/",
+	"title": "Add layers",
+	"tags": [],
+	"description": "",
+	"content": "Adding Layers to the Function The provided code uses two libraries, boto3 and requests. Therefore, we need to add these two layers to the Lambda function to make it executable.\nClick Layers. Click Add Layers. Select Specify an ARN.\nFor Specify an ARN, enter arn:aws:lambda:ap-southeast-1:770693421928:layer:Klayers-p39-requests:15.\nClick Verify, and then click Add. Repeat the process for the boto3 layer with the following ARN: arn:aws:lambda:ap-southeast-1:770693421928:layer:Klayers-p39-boto3:17.\nVerify the added layers\u0026rsquo; information. Next, we will proceed to add policies to the function\n"
+},
+{
+	"uri": "/2-dynamodb/",
+	"title": "Create DynamoDB",
+	"tags": [],
+	"description": "",
+	"content": "Initializing Amazon DynamoDB Enter \u0026ldquo;Amazon DynamoDB\u0026rdquo; in the service search bar on the AWS Console, then select \u0026ldquo;Amazon DynamoDB.\u0026rdquo; Choose \u0026ldquo;Create table.\u0026rdquo; Set the table name as weather-Db.\nFor the Partition key, enter the key to be used in the table. Enter timestamp.\nIn the Table setting section, choose Default settings to keep the default settings for other configurations. Click the Create table button. Wait for about 3 minutes for Amazon DynamoDB to be created. Once Amazon DynamoDB is successfully created, you will see the status as Active as shown in the image. "
+},
+{
+	"uri": "/6-glue/6.2-jobs/",
+	"title": "Create ETL job",
+	"tags": [],
+	"description": "",
+	"content": "Creating an ETL Job In the Glue service, in the left navigation pane, select ETL jobs, then choose Visual with a source target. Select Source as AWS Glue Data Catalog and Target as Amazon S3. Click Create. Choose the source Data Catalog table. Then select the database and Table that we created in the previous part. Choose the action transform. Here we can rename, change data types, and delete data fields. Choose the target S3 bucket. Here we select Format: CSV, Type: None, and S3 tagger: s3://weather-s3-db. Go to the Job details tab, change the job name to DynamoDB-ETL-S3. Choose IAM Role: Lab-role. Go to the script tab, here we modify the code from: frame=ApplyMapping-node2, to:\nframe=ApplyMapping-node2.coalesce(1), as shown in the image. Then click Save and Run.\nSwitch to the Runs tab, and after seeing the Run status: Succeeded, the job has run successfully. Check the result by accessing the S3 service. Then go to the weather-s3-db bucket.\nWe see that a file has just been created. Download the file to your machine. Open the file, and we see the data after a successful ETL. Next, we will add the trigger feature.\n"
+},
+{
+	"uri": "/4-event/4.2-test/",
+	"title": "Test",
+	"tags": [],
+	"description": "",
+	"content": "Checking Activity Status Check through the CloudWatch service - where logs are stored.\nGo back to the Lambda page. Access the function that we created earlier. Switch to the Monitor tab. Then select View CloudWatch logs. Click on the respective logs stream. The status data is stored here. Check the data stored in DynamoDB when the Lambda function executed successfully.\nGo back to the DynamoDB page. Access the table that we created earlier. Choose Explore table items. Scroll down to the bottom of the page. Here, we can see the data fetched through the Lambda function. Next, we will proceed to add policies to the function\n"
+},
+{
+	"uri": "/3-lambda/3.3-addpolicies/",
+	"title": "Add policies",
+	"tags": [],
+	"description": "",
+	"content": "Adding Policies to the Function To allow the Lambda function to store data in DynamoDB, we need to add the necessary permissions.\nSelect the Configuration tab \u0026ndash;\u0026gt; Permissions.\nClick on the Role name to switch to a new tab. Click Add permissions \u0026ndash;\u0026gt; Add policies. Search for the keyword DynamoDB.\nCheck the box for AmazonDynamoDBFullAccess.\nClick Add permissions. By adding the AmazonDynamoDBFullAccess policy, the Lambda function will now have the necessary permissions to store data in DynamoDB successfully.\n"
+},
+{
+	"uri": "/3-lambda/",
+	"title": "Build lambda function",
+	"tags": [],
+	"description": "",
+	"content": "In this section, we will use a Lambda function to call an API and retrieve the current weather data for Ho Chi Minh City from the OpenWeatherMap website. Then, the Lambda function will store the data in DynamoDB.\nHere are some key concepts to know:\nLayer: In AWS Lambda, a \u0026ldquo;Layer\u0026rdquo; is a mechanism that allows you to share code and libraries among multiple Lambda functions efficiently. This helps reduce the file size of each function, reduces build time, and improves code management.\nPolicies: \u0026ldquo;Policies\u0026rdquo; are JSON documents that define the access and actions that IAM (Identity and Access Management) entities can perform on Lambda functions and other related resources. Policies help control access and security for Lambda resources, ensuring that only authorized entities can perform necessary actions.\nContents Initialization Adding Layers Adding Policies "
+},
+{
+	"uri": "/6-glue/6.3-trigger/",
+	"title": "Create Trigger",
+	"tags": [],
+	"description": "",
+	"content": "Logging In the Glue service, in the left navigation pane, select Triggers, then click Add trigger. Enter a name for the trigger: trigger-job-per-hour. Select Schedule to create an automatic schedule. In the Schedule section, choose Hourly, 40 Minute. Click Next. This setting will create an hourly schedule to run the trigger at minute 40. Choose Add a target resource. Select Type: Job, Job name: DynamoDB-ETL-S3. Click Add. Check Enable trigger on creation to enable the trigger immediately after creation. Click Create. Next, we will add new features to our web application with Amazon Rekognition.\n"
+},
+{
+	"uri": "/4-event/",
+	"title": "Use EventBridge to create automated calendars and audit",
+	"tags": [],
+	"description": "",
+	"content": "In this lab, we will leverage the Schedules feature of the EventBridge service to create an automatic schedule to trigger the Lambda function and fetch data. We will take advantage of the flexibility and convenience of EventBridge to automate tasks and gather data from various sources easily and efficiently.\n"
+},
+{
+	"uri": "/5-s3/",
+	"title": "Create S3",
+	"tags": [],
+	"description": "",
+	"content": "Initializing S3 Enter \u0026ldquo;S3\u0026rdquo; in the service search bar on the AWS Console, then select \u0026ldquo;S3.\u0026rdquo; Choose Create bucket. Set the bucket name as weather-s3-db. Keep the default configuration. Scroll down to the bottom and click Create bucket. Wait for about 3 minutes for S3 to be created.\n"
+},
+{
+	"uri": "/6-glue/",
+	"title": "AWS Glue Service Configuration",
+	"tags": [],
+	"description": "",
+	"content": "Overview AWS Glue is a powerful data integration and processing service on AWS. It offers several features to manage and process data in a cloud environment. Below is a brief introduction to three key features of AWS Glue:\nCrawler: This feature automatically detects and analyzes the data structure from unstructured data sources such as Amazon S3, file systems, relational databases, and more. It scans the data sources and automatically creates table metadata in the AWS Glue Data Catalog. This makes it easy to process data without the need for manually specifying the data structure.\nETL Jobs (Extract, Transform, Load): ETL Jobs enable building automated data processing workflows to extract data from sources, transform data according to specific rules and standards, and then load the processed data into a target destination. ETL Jobs can run automatically and are often used to normalize and optimize data before analysis.\nTrigger: Triggers allow for the automatic activation of Glue jobs (ETL Jobs) or other data processing workflows when specific events occur. These events can be additions, modifications, or deletions of data in your data source. Triggers help create automated and flexible workflows, synchronizing data processing with changes in the data source.\nContents Create a Crawler Create an ETL Job Create a Trigger "
+},
+{
+	"uri": "/7-test/",
+	"title": "Test",
+	"tags": [],
+	"description": "",
+	"content": "Automatic Execution Results of the Crawler and Trigger Job Crawler We can observe that the Crawler automatically executes at 30 minutes past every hour, as we have set up. The status is Completed. Trigger Job We can see that the ETL Job automatically executes via the trigger at 40 minutes past every hour, as we have configured. The status is Succeeded. The data is successfully stored in the S3 bucket right after execution. "
+},
+{
+	"uri": "/8-terminate/",
+	"title": " Resource cleanup",
+	"tags": [],
+	"description": "",
+	"content": "ETL Jobs Access the ETL jobs tab in AWS Glue and select the jobs that were created during the lab. Then choose Action \u0026ndash;\u0026gt; Delete job(s). Enter Delete, and then select Delete. Perform similar actions with the resources created in the lab in the following order: Trigger\nCrawler\nData Catalog\nS3 bucket\nNote: When deleting the S3 bucket, make sure to delete all files stored in the bucket first.\nLambda function\nDynamoDB\nWith this, we have cleaned up all the resources used in this workshop.\n"
+},
+{
+	"uri": "/categories/",
+	"title": "Categories",
+	"tags": [],
+	"description": "",
+	"content": ""
+},
+{
+	"uri": "/tags/",
+	"title": "Tags",
+	"tags": [],
+	"description": "",
+	"content": ""
+}]

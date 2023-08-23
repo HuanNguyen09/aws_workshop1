@@ -1,0 +1,134 @@
+[
+{
+	"uri": "/vi/1-introduce/",
+	"title": "Giới thiệu",
+	"tags": [],
+	"description": "",
+	"content": "Đường ống dữ liệu (pipeline data) sử dụng AWS Lambda, Amazon DynamoDB, Amazon S3 (Simple Storage Service), Amazon EventBridge, AWS Glue. Trong đường ống này, AWS Lambda sẽ được sử dụng để gọi API và lưu trữ dữ liệu vào DynamoDB. Hàm Lambda này sẽ được kích hoạt tự động mỗi giờ thông qua Amazon EventBridge, được cấu hình để tạo lịch tự động. Sau đó, dữ liệu từ DynamoDB sẽ được xử lý ETL (Extract, Transform, Load) bởi AWS Glue và sau đó lưu trữ vào Amazon S3.\nSơ đồ dưới đây minh họa kiến trúc đường ống dữ liệu: "
+},
+{
+	"uri": "/vi/2-dynamodb/",
+	"title": "Khởi tạo DynamoDB",
+	"tags": [],
+	"description": "",
+	"content": "Khởi tạo Amazon DynamoDB Nhập Amazon DynamoDB ở thanh tìm kiếm service trên AWS Console sau đó chọn Amazon DynamoDB. Chọn Create table Đặt tên cho table là weather-Db.\nPartition key, hãy nhập khóa sử dụng trong bảng. Nhập timestamp\nSang phần Table setting, chọn Default settings giữ nguyên cài đặt mặc định cho các thiết lập khác. Click nút Create table. Đợi khoảng 3 phút để Amazon DynamoDB được tạo. Khi Amazon DynamoDB được tạo xong, chúng ta sẽ thấy trạng thái Active như hình. "
+},
+{
+	"uri": "/vi/3-lambda/3.1-create/",
+	"title": "Khởi tạo lambda funtion",
+	"tags": [],
+	"description": "",
+	"content": "Khởi tạo lambda function Nhập Lambda ở thanh tìm kiếm service trên AWS Console sau đó chọn Lambda. Chọn Create function Click Author from scratch.\nĐặt tên cho function là GetAPI-weather-function.\nChọn Runtime: Python 3.9. Architecture: x86_64 Click nút Create function. Đợi khoảng 3 phút để function được tạo. Khi Amazon DynamoDB được tạo xong, chúng ta sẽ thấy trạng thái như hình. Chúng ta copy đoạn mã sau và paste vào Code source.\nimport boto3 import requests import json def lambda_handler(event, context): # Call API to get raw data api_url = \u0026quot;https://api.openweathermap.org/data/2.5/weather?lat=10.76\u0026amp;lon=106.66\u0026amp;appid=b0e2fd79db41681ab871e658860bc3e7\u0026quot; response = requests.get(api_url) if response.status_code == 200: # Get data from API responses raw_data = response.json() # Extract values from API responses temperature = str(raw_data[\u0026quot;main\u0026quot;][\u0026quot;temp\u0026quot;]) # Temperature weather_description = raw_data[\u0026quot;weather\u0026quot;][0][\u0026quot;description\u0026quot;] # description wind_speed = str(raw_data[\u0026quot;wind\u0026quot;][\u0026quot;speed\u0026quot;]) pressure = str(raw_data[\u0026quot;main\u0026quot;][\u0026quot;pressure\u0026quot;]) humidity = str(raw_data[\u0026quot;main\u0026quot;][\u0026quot;humidity\u0026quot;]) visibility = str(raw_data[\u0026quot;visibility\u0026quot;]) country = raw_data[\u0026quot;sys\u0026quot;][\u0026quot;country\u0026quot;] city_name = raw_data[\u0026quot;name\u0026quot;] # Store data in a DynamoDB table dynamodb = boto3.resource(\u0026quot;dynamodb\u0026quot;) table_name = \u0026quot;weather-Db\u0026quot; # Replace with your actual DynamoDB table name table = dynamodb.Table(table_name) print(table) try: table.put_item( Item={ \u0026quot;timestamp\u0026quot;: str(event[\u0026quot;time\u0026quot;]), \u0026quot;temperature\u0026quot;: temperature, \u0026quot;weather_description\u0026quot;: weather_description, \u0026quot;wind_speed\u0026quot;: wind_speed, \u0026quot;pressure\u0026quot;: pressure, \u0026quot;humidity\u0026quot;: humidity, \u0026quot;visibility\u0026quot;: visibility, \u0026quot;country\u0026quot;: country, \u0026quot;city_name\u0026quot;: city_name } ) return { \u0026quot;statusCode\u0026quot;: 200, \u0026quot;body\u0026quot;: json.dumps('Data has been stored in DynamoDB successfully.') } except Exception as e: return { \u0026quot;statusCode\u0026quot;: 500, \u0026quot;body\u0026quot;: f\u0026quot;Error storing data: {str(e)}\u0026quot; } else: return { \u0026quot;statusCode\u0026quot;: response.status_code, \u0026quot;body\u0026quot;: json.dumps('Failed to retrieve data from the API.') } Sau đó click Deploy.\nSource code trên sẽ giúp chúng ta thực hiện gọi API lấy dữ liệu và lưu về DynamoDB\nTiếp theo ta thêm layer cho funcion\n"
+},
+{
+	"uri": "/vi/4-event/4.1-create/",
+	"title": "Khởi tạo Schedules",
+	"tags": [],
+	"description": "",
+	"content": "Khởi tạo Schedules Nhập EventBridge ở thanh tìm kiếm service trên AWS Console sau đó chọn Amazon EventBridge. Chọn tab Schedules phía bên trái. Sau đó chọn Create schedules Đặt tên cho schedules là aotu-getAPI-weather-per-minute. Ở phần Schedule pattern, chúng ta cấu hình như sau Kéo xuống cuối và chọn Next. Chọn Templated targets \u0026ndash;\u0026gt; AWS Lambda Chọn lambda function ta đã tạo trước đó. Kéo xuống cuối trang và chọn Next. Tắt Retry Policy. Kéo xuống cuối trang và chọn Next. Kiểm tra lại thông tin và chọn Create schedules. Đợi khoảng 3 phút để schedules được tạo. Khi tạo xong, chúng ta sẽ thấy trạng thái Enabled như hình. Tiếp theo ta kiểm tra schedules có hoạt động không\n"
+},
+{
+	"uri": "/vi/",
+	"title": "Serverless Application",
+	"tags": [],
+	"description": "",
+	"content": "Triển khai đường ống dữ iệu sử dụng các dịch vụ của AWS Tổng quan Trong bài workshop này, chúng ta sẽ tạo một đường ống dữ liệu (pipeline data) tự động lấy dữ liệu thông qua API, kết hợp với các dịch vụ của AWS như: AWS Lambda, Amazon DynamoDB, Amazon S3 (Simple Storage Service), Amazon EventBridge, AWS Glue\nAWS Lambda: là một dịch vụ tính toán đám mây dựa trên mô hình serverless của Amazon Web Services. Nó cho phép bạn chạy mã mà không cần quản lý các máy chủ phía sau, tự động mở rộng khi cần thiết, và tính giá theo thời gian thực thi. Lambda thường được kích hoạt bởi các sự kiện như yêu cầu HTTP hoặc sự kiện từ các dịch vụ AWS khác. Amazon DynamoDB: là một dịch vụ cơ sở dữ liệu NoSQL đám mây của AWS. Nó cung cấp khả năng lưu trữ và truy vấn dữ liệu linh hoạt và mở rộng được cho các ứng dụng web và di động. DynamoDB được thiết kế để cung cấp khả năng mở rộng tự động và đáng tin cậy, hỗ trợ các ứng dụng với lưu lượng truy vấn cao và yêu cầu thời gian thực. Amazon S3 (Simple Storage Service): là một dịch vụ lưu trữ đám mây của AWS. Nó cung cấp khả năng lưu trữ không giới hạn cho các đối tượng dữ liệu như hình ảnh, video, tệp tin và dữ liệu lưu trữ. S3 được sử dụng rộng rãi như một giải pháp lưu trữ đáng tin cậy, dễ sử dụng và có khả năng mở rộng cho các ứng dụng web và di động. Amazon EventBridge: Amazon EventBridge là một dịch vụ trung gian sự kiện của AWS, cho phép các ứng dụng gửi và nhận các sự kiện từ các nguồn khác nhau trong hệ thống. Nó giúp bạn kết nối và tích hợp các ứng dụng và dịch vụ khác nhau, tự động kích hoạt hành động và xử lý dữ liệu theo các quy tắc được xác định trước. AWS Glue: là một dịch vụ ETL (Extract, Transform, Load) đám mây của AWS. Nó cho phép bạn trích xuất dữ liệu từ nhiều nguồn khác nhau, biến đổi dữ liệu theo các quy tắc xác định trước và tải dữ liệu vào các kho lưu trữ khác nhau. Glue tự động xác định cấu trúc dữ liệu, giúp giảm thiểu công việc và thời gian triển khai quy trình ETL. Nội dung Giới thiệu Khởi tạo DynamoDB và cấu hình TTL Xây dựng lambda function Sử dụng EventBridge tạo lịch tự động Khởi tạo S3 Cấu hình AWS Glue Kiểm tra kết quả Dọn dẹp tài nguyên "
+},
+{
+	"uri": "/vi/6-glue/6.1-crawler/",
+	"title": "Tạo Crawler",
+	"tags": [],
+	"description": "",
+	"content": "Trước tiên, ta tạo role trong AIM Nhập AIM ở thanh tìm kiếm service trên AWS Console sau đó chọn AIM. 2. Ở thanh điều hướng bên trái, chọn Rules.. Chọn Create role Chọn AWS service. Tìm AWS service Glue. Chọn Next* Tìm policies với từ khóa Power. Tích vào PowerUserAccess. Chọn Next. 5. Role name điền: Lab-role. 6. Chọn Create role. Tiếp theo, chúng ta tiến hành tạo crawler.\nNhập Glue ở thanh tìm kiếm service trên AWS Console sau đó chọn AWS Glue. Ở thanh điều hướng bên trái, chọn Rules.. Chọn Add database Điền tên database: datacatalog-dynamodb. Chọn Create database. 4. Chọn tên databases vừa khởi tạo. 5. Chọn Add tables using crawler. 6. Điền tên crawler: crawler-aotu-per-hour. Chọn Next. 7. Chọn Add a data source. 8. Chọn DynamoDB và weather-DB (tên bảng DynamoDB đã khởi tạo ở phần 2). Chọn Add a DynamoDB data source. 9. Chọn AIM role ta khởi tạo ở trên: Lab-role. Chọn Next. 10. Điền taget database: datacatalog-dynamodb.\nPhần Crawler schedule: ta lần lượt chọn Hourly và 30 Minute. Chọn Next. Kiểm tra lại thông tin và chọn create crawler. Chọn Run crawler và đợi khoảng 2 phút đến khi crawler thực hiện xong. Kiểm tra kết quả sau khi crawler thực thi.\nVào bảng database mà ta đã tạo ở trên datacatalog-dynamodb. Ta thấy bảng weather_db đã được khởi tạo.\n3. Chọn vào bảng weather-db, chúng ta thấy crawler đã trích xuất dữ liệu thành công từ DynamoDb và xây dụng các schema tương ứng. "
+},
+{
+	"uri": "/vi/4-event/4.2-test/",
+	"title": "Kiểm tra ",
+	"tags": [],
+	"description": "",
+	"content": "Kiểm tra tình trạng hoạt động Kiểm tra qua dịch vụ CloudWatch - nơi lưu trữ file logs.\nVề lại trang Lambda. Vào function mà chúng ta đã tạo trước đó. Chuyển qua tab Monitor. Và chọn View CloudWatch logs Click vào bản logs stream. Dữ liệu trạng thái được lưu trữ tại đây. Kiểm tra qua dữ liệu lưu về DynamoDB khi lambda function thực thi thành công.\nVề lại trang DynamoDB. Vào table mà chúng ta đã tạo trước đó. Chọn Explore table items. 2. Kéo xuống cuối trang. Chúng ta sẽ thấy dữ liệu được lấy về thông qua Lambda function. Tiếp theo, chúng ta sẽ đến phần thêm policies cho funcion\n"
+},
+{
+	"uri": "/vi/6-glue/6.2-jobs/",
+	"title": "Tạo ETL job",
+	"tags": [],
+	"description": "",
+	"content": "Khởi tạo job ETL Vào trang Glue, ở tab bên trái chọn ETL jobs. Sau đó, chọn Visual with a source taget. Source chọn AWS Glue Data Catalog. Taget chọn Amazon S3. Chọn Create. 2. Chọn source Data Catalog table. Sau đó chọn các database và Table mà chúng ta đã tạo ở phần trước.\nChọn action transform. Tại đây chúng ta có thể đổi tên, đổi kiểu, xóa các trường dữ liệu. Chọn taget S3 bucket. Tại đây ta chọn Format: CSV, Type: None, S3 tagger: s3://weather-s3-db. Chọn tab Job details, đổi tên job: DynamoDB-ETL-S3. Chọn IAM Role: Lab-role. Chọn tab script, tại đây chúng ta sửa đoạn code\nframe=ApplyMapping-node2, thành:\nframe=ApplyMapping-node2.coalesce(1), như hình. Sau đó chọn Save \u0026ndash;\u0026gt; Run. Chuyển qua tab Runs, sau khi ta thấy Run status: Succeeded thì job đã chạy thành công. Kiểm tra kết quả bằng cách truy cập vào dịch vụ S3. Sau đó vào bảng weather-s3-db.\nTa thấy có 1 tệp vừa được khởi tạo, chúng ta dowload tệp về máy. Mở tệp ta thấy dự liệu sau khi ETL thành công. Tiếp theo, chúng ta sẽ thêm tính năng trigger.\n"
+},
+{
+	"uri": "/vi/3-lambda/3.2-addlayers/",
+	"title": "Thêm layers",
+	"tags": [],
+	"description": "",
+	"content": "Thêm layers cho function Trong đoạn mã có sử dụng 2 thư viện là boto3 và requests. Vì vậy, ta cần thêm 2 layers này vào để hàm lambda có thể thực thi được.\nClick Layers. Click Add Layers. Chọn Specify an ARN.\nTại Specify an ARN chúng ta điền arn:aws:lambda:ap-southeast-1:770693421928:layer:Klayers-p39-requests:15\nChọn Verify. Sau có chọn Add Làm tương tự với layer boto3 với ARN sau: arn:aws:lambda:ap-southeast-1:770693421928:layer:Klayers-p39-boto3:17\nKiểm tra thông tin layers được thêm. Tiếp theo, chúng ta sẽ đến phần thêm policies cho funcion\n"
+},
+{
+	"uri": "/vi/6-glue/6.3-trigger/",
+	"title": "Tạo trigger",
+	"tags": [],
+	"description": "",
+	"content": "Logging Tại trang dịch vụ Glue, trên thanh điều hướng bên trái, ta chọn Triggers. Sau đó, click Add trigger Điền tên cho trigger: trigger-job-per-hour Chọn Schedule để tạo lịch tự động. Trong phần Schudule ta lân lượt chọn Hourly, 40 Minute. Chọn Next. Thiết lập này sẽ tạo lịch chạy hằng giờ tại phút 40. Chọn Add a taget rtesource. Chúng ta chọn Type: Job, Job name: DynamoDB-ETL-S3. Click Add. Tích chọn Enable trigger on creation để bật trigger ngay sau khi tạo thành công. Click Create. Tiếp theo, chúng ta sẽ thêm tính năng mới vào ứng dụng web của chúng ta với Amazon Rekognition.\n"
+},
+{
+	"uri": "/vi/3-lambda/3.3-addpolicies/",
+	"title": "Thêm Policies",
+	"tags": [],
+	"description": "",
+	"content": "Thêm policies cho function Để lambda có thể lưu dữ liệu vào DynamoDB, ta cần thêm quyền cho nó.\nChọn tab Configuration \u0026ndash;\u0026gt; Permisstions.\nClick vào Role name để chuyển qua tab mới. Click Add permisstions \u0026ndash;\u0026gt; Add policies. Tìm kiếm với từ khóa DynamoDB\nTích chọn AmazonDynamoDBFullAccess\nChọn Add permisstions. "
+},
+{
+	"uri": "/vi/3-lambda/",
+	"title": "Xây dựng lambda function",
+	"tags": [],
+	"description": "",
+	"content": "Trong phần này, chúng ta sẽ sử dụng lambda function để gọi API lấy dữu liệu thời tiết hiện tại ở thành phố Hồ Chí Minh từ web OpenWeatherMap. Sau đó, lambda function sẽ lưu dữ liệu trong DynamoDB.\nMột số khái niệm cần biết:\nLayer (lớp) trong AWS Lambda là một cơ chế giúp bạn chia sẻ mã code và thư viện giữa nhiều hàm Lambda khác nhau một cách hiệu quả. Điều này giúp giảm dung lượng tệp của mỗi hàm, giảm thời gian xây dựng và cải thiện quản lý mã.\nPolicies (chính sách) là các tài liệu JSON định nghĩa quyền truy cập và hành động mà các đối tượng IAM (Identity and Access Management) có thể thực hiện trên các hàm Lambda và các tài nguyên liên quan khác. Policies giúp kiểm soát quyền truy cập và bảo mật cho các tài nguyên của Lambda, đảm bảo rằng chỉ những đối tượng được ủy quyền mới có thể thực hiện các hành động cần thiết.\nNội dung Khởi tạo Thêm layers Thêm policies "
+},
+{
+	"uri": "/vi/4-event/",
+	"title": "Sử dụng EventBridge tạo lịch tự động và kiểm tra",
+	"tags": [],
+	"description": "",
+	"content": "Trong bài lab này, chúng ta sẽ tận dụng tính năng Schedules của dịch vụ EventBridge để tạo lịch trình tự động kích hoạt lambda function và lấy dữ liệu. Chúng ta sẽ tận dụng tính linh hoạt và tiện ích của EventBridge để thực hiện các công việc tự động và thu thập dữ liệu từ các nguồn khác nhau một cách dễ dàng và hiệu quả.\n"
+},
+{
+	"uri": "/vi/5-s3/",
+	"title": "Khởi tạo S3",
+	"tags": [],
+	"description": "",
+	"content": "Tổng quan Khởi tạo S3 Nhập S3 ở thanh tìm kiếm service trên AWS Console sau đó chọn S3. Chọn Create bucket Đặt tên cho bucket là weather-s3-db. Giữ nguyên cấu hình mặc định. Kéo xuống cuối trang và chọn Create bucket. Đợi khoảng 3 phút để S3 được tạo.\n"
+},
+{
+	"uri": "/vi/6-glue/",
+	"title": "Cấu hình dịch vụ AWS Glue",
+	"tags": [],
+	"description": "",
+	"content": "Tổng quan AWS Glue là một dịch vụ tích hợp và xử lý dữ liệu trên AWS. Nó cung cấp nhiều tính năng mạnh mẽ để quản lý và xử lý dữ liệu trong môi trường đám mây. Dưới đây là một giới thiệu ngắn về ba tính năng quan trọng của AWS Glue:\nCrawler (Điều hướng): là tính năng tự động phát hiện và phân tích cấu trúc dữ liệu từ các nguồn dữ liệu không cấu trúc như Amazon S3, hệ thống tệp, cơ sở dữ liệu quan hệ và nhiều nguồn khác. Nó quét các nguồn dữ liệu và tự động tạo các bản mô tả bảng (table metadata) trong AWS Glue Data Catalog. Điều này giúp dễ dàng xử lý dữ liệu mà không cần phải chỉ định cấu trúc dữ liệu thủ công.\nETL Jobs (Xử lý dữ liệu Extract, Transform, Load): cho phép chúng taxây dựng các quy trình xử lý dữ liệu tự động để trích xuất dữ liệu từ nguồn, biến đổi (transform) dữ liệu theo các quy tắc và tiêu chuẩn cụ thể, sau đó tải dữ liệu đã xử lý vào nguồn đích. ETL Jobs có thể chạy tự động và thường được sử dụng để chuẩn hóa và tối ưu hóa dữ liệu trước khi phân tích.\nTrigger (Kích hoạt): cho phép chúng tatự động kích hoạt các công việc Glue (ETL Jobs) hoặc quy trình xử lý dữ liệu khác khi có sự kiện xảy ra. Sự kiện này có thể là việc thêm, sửa đổi hoặc xóa dữ liệu trong nguồn dữ liệu của bạn. Trigger giúp chúng tatạo các luồng công việc tự động và linh hoạt, đồng bộ hóa việc xử lý dữ liệu với sự thay đổi trong nguồn dữ liệu.\nNội dung Tạo Crawler Tạo ETL job Tạo trigger "
+},
+{
+	"uri": "/vi/7-test/",
+	"title": "Kiểm tra kết quả ",
+	"tags": [],
+	"description": "",
+	"content": "Kiểm tra kết quả thực thi tự động của trigger và crawler Crawler Chúng ta có thể thấy Crawler tự động thực thi vào phút thứ 30 mỗi giờ như ta đã thiết lập. Trạng thái Completed. Trigger job Chúng ta có thể thấy ETL Job tự động thực thi thông qua trigger vào phút thứ 40 mỗi giờ như ta đã thiết lập. Trạng thái Succeeded. Dữ liệu được lưu thành công về S3 bucket ngay sau đó. "
+},
+{
+	"uri": "/vi/8-terminate/",
+	"title": "Dọn dẹp tài nguyên",
+	"tags": [],
+	"description": "",
+	"content": "ETL jobs Truy cập vào tab ETL jobs trong AWS Glue chọn các job đã khởi tạo trong bài lab. Sau đó chọn Action \u0026ndash;\u0026gt; Delete job(s) 2. Điền Delete, chọn Delete Thao tác tương tự với các tài nguyên đã khởi tạo trong bài lab theo thứ tự sau: Trigger\nCrawler\nData Catalog\nS3 bucket Lưu ý: Khi xóa S3 bucket, ta cần xóa hết các file đã lưu trong bucket trước.\nLambda function\nDynamoDB\nVậy là chúng ta đã dọn dẹp tất cả tài nguyên trong workshop này.\n"
+},
+{
+	"uri": "/vi/categories/",
+	"title": "Categories",
+	"tags": [],
+	"description": "",
+	"content": ""
+},
+{
+	"uri": "/vi/tags/",
+	"title": "Tags",
+	"tags": [],
+	"description": "",
+	"content": ""
+}]
